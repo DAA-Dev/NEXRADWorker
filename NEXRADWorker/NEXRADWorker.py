@@ -112,7 +112,7 @@ class NEXRADStationManager():
     # First, queries AWS and logs the relevant queries, then initiates downloads of relevant files
     def pull_new_data(self):
         for station in self.__relevant_stations:
-            print()
+            name = station.icao
         return None
 
     # Clears the downloaded files from local directory for NEXRAD data
