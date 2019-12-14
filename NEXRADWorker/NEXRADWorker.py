@@ -5,6 +5,12 @@ from txtparsing import DataWorker
 LOC_FOLS = config.LOC_FOLS
 TAG = 'NEXRADWorker - '
 
+# Simple sign-extension method
+def s_ext(str, length):
+    while len(str) != length:
+        str = '0'+str
+    return str
+
 # Class to manage all the files downloaded, deleting and updating as necessary
 class NEXRADStationManager():
     # Get the metadata for radar stations and store as a list of RadarStations, sorted from lowest
@@ -111,8 +117,39 @@ class NEXRADStationManager():
     # Method to pull data for each station from AWS
     # First, queries AWS and logs the relevant queries, then initiates downloads of relevant files
     def pull_new_data(self):
+        year = self.__sim_time.year
+        month = self.__sim_time.month
+        day = self.__sim_time.day
+        self.cl_wd()
+
+        logging.info(TAG+'starting a pull of new data')
+        aws_interface = nexradaws.NexradAwsInterface()
+        radar_list = aws_interface.get_avail_radars(year, month, day)
+        print(radar_list)
         for station in self.__relevant_stations:
             name = station.icao
+            if name in radar_list:
+                scans = aws_interface.get_avail_scans(s_ext(str(year), 4), s_ext(str(month), 2), s_ext(str(day), 2), name)
+                closest_time_delta = abs((self.__sim_time - scans[0].scan_time).total_seconds()) 
+                closest_scan  = scans[0]
+                for index in range(1, len(scans)-1):
+                    delta = abs((self.__sim_time - scans[index].scan_time).total_seconds()) 
+                    if delta > closest_time_delta:
+                        break
+                    else:
+                        closest_time_delta = delta
+                        closest_scan = scans[index]
+                logging.info(TAG+name)
+                logging.info(TAG+'target time: ' + str(self.__sim_time))
+                logging.info(TAG+'scan time: ' + str(closest_scan.scan_time))
+
+                # Now have the closest scan to the __sim_time stored inside closest_scan
+                # Next step is to dowload the scan! 
+
+        return None
+
+    # Method that combines all the scans in the 'nexrad' folder and creates an overlay for our simulator
+    def combine_scans_into_overlay():
         return None
 
     # Clears the downloaded files from local directory for NEXRAD data

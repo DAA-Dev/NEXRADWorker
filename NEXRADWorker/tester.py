@@ -18,6 +18,7 @@ time = datetime(2016, 3, 23, 12, 34, tzinfo=timezone.utc)
 manager = NEXRADStationManager([38.149284, -108.755224], [41.951239, -102.351951], time)
 list = manager.bin_search_longitude(-108.755224, -102.351951)
 NEXRADStationManager.cl_wd()
+manager.pull_new_data()
 print(len(list))
 
 
