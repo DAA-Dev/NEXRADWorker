@@ -1,5 +1,5 @@
 # Imports for proper program functionality
-import nexradaws, config, pytz, pyart, tempfile
+import nexradaws, config, pytz, pyart, tempfile,logging
 import matplotlib.pyplot as plt
 from NEXRADWorker import NEXRADStationManager
 from txtparsing import DataWorker
@@ -12,17 +12,28 @@ config.init_environment()
 LOC_FOLS = config.LOC_FOLS
 BING_KEY = config.BING_MAPS_API_KEY
 
+TAG = 'tester - '
+
 worker = DataWorker(LOC_FOLS['meta']+'nexrad-stations-template.txt')
 
 time = datetime(2016, 3, 23, 12, 34, tzinfo=timezone.utc)
-manager = NEXRADStationManager([38.149284, -108.755224], [41.951239, -102.351951], time)
-list = manager.bin_search_longitude(-108.755224, -102.351951)
+manager = NEXRADStationManager([40.149284, -104.755224], [41.951239, -102.351951], time)
+#list = manager.bin_search_longitude(-108.755224, -102.351951)
 NEXRADStationManager.cl_wd()
 manager.pull_new_data()
-print(len(list))
+
+manager.print_scan_data()
+manager.combine_scans_into_overlay()
+logging.info(TAG+'Done executing.')
 
 
-# Example code from the nexradaws examples page
+
+
+## Example code from the nexradaws examples page
+#print('************************************************')
+#print('Going on to a sample download and display of radar plots')
+#print('************************************************')
+
 #conn = nexradaws.NexradAwsInterface()
 #central_timezone = pytz.timezone('US/Central')
 #radar_id = 'KTLX'

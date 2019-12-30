@@ -1,5 +1,6 @@
 # Imports for proper program functionality
-import nexradaws, config, math, logging, os
+import nexradaws, config, math, logging, os, pyart
+import matplotlib.pyplot as plt
 from txtparsing import DataWorker
 
 LOC_FOLS = config.LOC_FOLS
@@ -121,11 +122,12 @@ class NEXRADStationManager():
         month = self.__sim_time.month
         day = self.__sim_time.day
         self.cl_wd()
+        new_relevant_stations = []
 
         logging.info(TAG+'starting a pull of new data')
         aws_interface = nexradaws.NexradAwsInterface()
         radar_list = aws_interface.get_avail_radars(year, month, day)
-        print(radar_list)
+        # Updates the scans for each station to ones closest to the target time
         for station in self.__relevant_stations:
             name = station.icao
             if name in radar_list:
@@ -142,15 +144,43 @@ class NEXRADStationManager():
                 logging.info(TAG+name)
                 logging.info(TAG+'target time: ' + str(self.__sim_time))
                 logging.info(TAG+'scan time: ' + str(closest_scan.scan_time))
+                station.scan = closest_scan
+                new_relevant_stations.append(station)
 
-                # Now have the closest scan to the __sim_time stored inside closest_scan
-                # Next step is to dowload the scan! 
-
-        return None
+        # Have each RadarStation update itself, downloading its respective scan
+        self.__relevant_stations = new_relevant_stations
+        for station in self.__relevant_stations:
+            station.pull_data()
+        logging.info(TAG+'pulled data for all the stations in the station manager')
+        del aws_interface
 
     # Method that combines all the scans in the 'nexrad' folder and creates an overlay for our simulator
-    def combine_scans_into_overlay():
-        return None
+    def combine_scans_into_overlay(self):
+        local_scans = []
+        for station in self.__relevant_stations:
+            scan = station.create_map()
+            if scan is not None:
+                local_scans.append(scan)
+        local_scans = tuple(local_scans)
+        # None of this works. Figure out how to make it work. 
+
+
+        #grid = pyart.map.grid_from_radars(local_scans,
+        #                                  grid_shape=(1, 201, 201),
+        #                                  grid_limits=((100000, 100000), (-100000, 100000), (-100000, 100000)))
+        #print(type(grid))
+        #print(str(grid.fields))
+
+        #fig = plt.figure()
+        #ax = fig.add_subplot(111)
+        #ax.imshow(grid.fields['reflectivity']['data'][0], origin='lower', extent=(-60, 40, -50, 40), vmin=0, vmax=48)
+        #plt.show()
+
+
+    # Method to print metadata for all the relevant stations
+    def print_scan_data(self):
+        for station in self.__relevant_stations:
+            station.print_scan_data()
 
     # Clears the downloaded files from local directory for NEXRAD data
     @staticmethod
@@ -169,6 +199,7 @@ class RadarStation():
         self.elevation = elevation
         self.latitude = latitude
         self.longitude = longitude
+        self.scan = None
 
     @property
     def elevation(self):
@@ -194,8 +225,33 @@ class RadarStation():
     def longitude(self, longitude):
         self._longitude = float(longitude)
 
+    def pull_data(self):
+        aws_interface = nexradaws.NexradAwsInterface()
+        try:
+            self.local_data = aws_interface.download([self.scan], LOC_FOLS['nexrad'])._successfiles[0]
+        except:
+            self.local_data = None
+        del aws_interface
+
+    # Work here to create subplots, and then later to return proper object and metadata in order to data
+    # from multiple stations
     def create_map(self):
-        return None
+        if self.local_data is not None:
+            radar = self.local_data.open_pyart()
+            return radar
+            # Code to display a plot from one individual station
+            #display = pyart.graph.RadarDisplay(radar)
+            #fig = plt.figure(figsize=(6,5))
+            #ax = fig.add_subplot(111)
+            #display.plot('reflectivity', 0, title='', vmin=-32, vmax=64, colorbar_label='', ax=ax)
+            #plt.show()
+        else:
+            return None
+
+    def print_scan_data(self):
+         if self.local_data is not None:
+             logging.info(TAG+'Radar ' + self.icao + ' has data stored locally at: ' + self.local_data.filepath)
+             logging.info(TAG+'Scan time is: ' + str(self.local_data.scan_time))
 
     def __str__(self):
         printout  = '*****' + self.icao  + '*****' + ' \n'
@@ -207,3 +263,6 @@ class RadarStation():
 #   - NEXRAD stations have a range of 231.5 km
 # GPS coordinates are in the following format (lat, lon)
 # When looking at a Mercator projection that correlates to (y, x)
+
+# To improve the program runtime:
+#           - Look at possibly pulling metadata from AWS, not a local required txt file
